@@ -195,7 +195,7 @@ void my_encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key,
 	cipher_type = ENV_aes_256_cbc();
 
 	ctx = EVP_CIPHER_CTX_new();
-	EVP_CipherInit_ex(ctx, cipher_type, NULL, key, iv, encrypt);
+	EVP_CipherInit_ex(ctx, cipher_type, NULL, key, iv, my_encrypt);
 	// OPENSSL_assert(EVP_CIPHER_CTX_key_length(ctx) == 16);
 	// OPENSSL_assert(EVP_CIPHER_CTX_iv_length(ctx) == 16);
 
