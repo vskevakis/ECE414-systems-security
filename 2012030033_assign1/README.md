@@ -10,6 +10,7 @@ Make your own demos or run the demos that are available using the Makefile.
 ```sh
 $ cd simple-crypto
 $ make
+$ ./demo
 ```
 or
 ```sh
