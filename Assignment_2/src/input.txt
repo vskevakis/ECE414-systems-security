@@ -1,1 +1,2 @@
-This is input file
+This is an input file
+With two lines

@@ -7,10 +7,13 @@
 #include <openssl/err.h>
 #include <openssl/conf.h>
 #include <openssl/cmac.h>
-
+#include <openssl/aes.h>
 #include <openssl/kdf.h>
 
 #define BLOCK_SIZE 16
+/* 32 byte key (256 bit key) */
+#define AES_256_KEY_SIZE 32/* 16 byte block size (128 bits) */
+#define AES_BLOCK_SIZE 16
 
 
 /* function prototypes */
@@ -145,26 +148,22 @@ void
 keygen(unsigned char *password, unsigned char *key, unsigned char *iv,
     int bit_mode)
 {
-	iv = 1;
-	int keylen;
+	// printf(bit_mode);
+	// iv = 1;
+	int itter = 1;
+	int keylen = bit_mode;
 	unsigned char *salt = NULL;
-	if ( !bit_mode && bit_mode == 256)
-		keylen = 256;
-	else if (bit_mode == 128)
-		keylen = 128;
-	else {
-		printf("Unacceptable key length size");
-		return;
-	}
 
-	PKCS5_PBKDF2_HMAC_SHA1(password, strlen(password), (unsigned char*)salt, strlen(salt), iv, 32+16, key);
-    printf("PKCS5_PBKDF2_HMAC_SHA1(\"%s\", \"%s\", %d)=\n", password, salt, iv);
-    print_hex(key, 32+16);
+	PKCS5_PBKDF2_HMAC_SHA1(password, strlen(password), salt, 0,
+		itter, bit_mode, key);
+    // printf("PKCS5_PBKDF2_HMAC_SHA1(\"%s\", \"%s\", %d)=\n", password, salt, itter);
+    // print_hex(key, bit_mode);
 
-	iv = 1;
-    EVP_BytesToKey(EVP_aes_256_cbc(), EVP_sha1(), (unsigned char*)salt, (unsigned char*)password, strlen(password), iv, key, key+32);
-    printf("EVP_BytesToKey(\"%s\", \"%s\", %d)=\n", password, salt, iv);
-    print_hex(key, 32+16);
+	// iv = 1;
+    // EVP_BytesToKey(EVP_aes_256_cbc(), EVP_sha1(), (unsigned char*)salt, (unsigned char*)password,
+	// 	strlen(password), itter, key, key+32);
+    // printf("EVP_BytesToKey(\"%s\", \"%s\", %d)=\n", password, salt, itter);
+    // print_hex(key, bit_mode);
 	
 	return;
 
@@ -177,53 +176,34 @@ keygen(unsigned char *password, unsigned char *key, unsigned char *iv,
 void my_encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key,
     unsigned char *iv, unsigned char *ciphertext, int bit_mode)
 {
-
-	/* TODO Task B */
+	
+	int len=0, ciphertext_len=0;
 	EVP_CIPHER_CTX *ctx;
-	EVP_CIPHER *cipher_type;
-	int cipherlen = strlen(ciphertext);
-	key = "0123456789abcdeF";
-	iv = "1234567887654321";
 
-	/* Don't set key or IV right away; we want to check lengths */
-	// if (bit_mode = 128)
-	// 	cipher_type = ENV_aes_128_cbc();
-	// else if(bit_mode = 256)
-	// 	cipher_type = ENV_aes_256_cbc();
-	// else
-	// 	return;
-	cipher_type = ENV_aes_256_cbc();
-
-	ctx = EVP_CIPHER_CTX_new();
-	EVP_CipherInit_ex(ctx, cipher_type, NULL, key, iv, my_encrypt);
-	// OPENSSL_assert(EVP_CIPHER_CTX_key_length(ctx) == 16);
-	// OPENSSL_assert(EVP_CIPHER_CTX_iv_length(ctx) == 16);
-
-	/* Now we can set key and IV */
-	// EVP_CipherInit_ex(ctx, NULL, NULL, key, iv, encrypt);
-
-	for (;;) {
-		// inlen = fread(plaintext, 1, 1024, in);
-		if (plaintext_len <= 0)
-			break;
-		if (!EVP_CipherUpdate(ctx, ciphertext, &cipherlen, plaintext, plaintext_len)) {
-			/* Error */
-			printf(ciphertext);
-			EVP_CIPHER_CTX_free(ctx);
-			return;
-		}
-		// fwrite(ciphertext, 1, cipherlen, out);
-	}
-	if (!EVP_CipherFinal_ex(ctx, ciphertext, &cipherlen)) {
-		/* Error */
-		EVP_CIPHER_CTX_free(ctx);
+	// Create and initialize the context and return a pointer for success or NULL for failure
+	if (!(ctx = EVP_CIPHER_CTX_new()))
 		return;
+
+	/* Initialize the encryption operation. */
+	if (1 != EVP_EncryptInit_ex(ctx, EVP_aes_128_ecb(), NULL, key, NULL))
+		return;
+
+	if(plaintext)
+	{
+		if(1 != EVP_EncryptUpdate(ctx, ciphertext, &len, plaintext, plaintext_len))
+			return;
+		ciphertext_len = len;
 	}
-	// fwrite(ciphertext, 1, cipherlen, out);
 
+	if(1 != EVP_EncryptFinal_ex(ctx, ciphertext + len, &len))
+		return;
+
+	ciphertext_len += len;
+
+	/* Clean up */
 	EVP_CIPHER_CTX_free(ctx);
-
-return;
+	
+	return;
 }
 
 
@@ -231,7 +211,7 @@ return;
  * Decrypts the data and returns the plaintext size
  */
 int
-decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key,
+mydecrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key,
     unsigned char *iv, unsigned char *plaintext, int bit_mode)
 {
 	int plaintext_len;
@@ -239,6 +219,32 @@ decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key,
 	plaintext_len = 0;
 
 	/*TODO Task C */
+	int len=0;
+	EVP_CIPHER_CTX *ctx;
+
+	// Create and initialize the context and return a pointer for success or NULL for failure
+	if (!(ctx = EVP_CIPHER_CTX_new()))
+		return NULL;
+
+	/* Initialize the encryption operation. */
+	if (1 != EVP_DecryptInit_ex(ctx, EVP_aes_128_ecb(), NULL, key, NULL))
+		return NULL;
+
+	if(ciphertext)
+	{
+		if(1 != EVP_DecryptUpdate(ctx, plaintext, &len, ciphertext, ciphertext_len))
+			return NULL;
+
+		plaintext_len = len;
+	}
+
+	if(1 != EVP_DecryptFinal_ex(ctx, plaintext + len, &len))
+		return NULL;
+
+	plaintext_len += len;
+
+	/* Clean up */
+	EVP_CIPHER_CTX_free(ctx);
 
 	return plaintext_len;
 }
@@ -346,34 +352,59 @@ main(int argc, char **argv)
 		}
 	}
 
-
 	/* check arguments */
 	check_args(input_file, output_file, password, bit_mode, op_mode);
 
-
-
 	/* TODO Develop the logic of your tool here... */
 
-
-
-
 	/* Initialize the library */
+	unsigned char key[bit_mode];	/* the user defined password */
+	unsigned char *iv = "1234";	/* the user defined password */
+	FILE *infptr, *outfptr;
 
 
 	/* Keygen from password */
+	keygen(password, key, iv, bit_mode);
 
 
 	/* Operate on the data according to the mode */
 	/* encrypt */
+	// infptr = fopen(input_file, "r");
+	if ((outfptr = fopen(output_file, "w+")) == NULL) {
+		printf("Error opening output file");
+		exit(1);
+	}
+	else if (((infptr = fopen(input_file, "r")) == NULL)) {
+		printf("Error opening input file");
+		exit(1);
+	}
+	fseek(infptr, 0, SEEK_END);
+	long fsize = ftell(infptr);
+	fseek(infptr, 0, SEEK_SET);  /* same as rewind(f); */
+	char *plaintext = malloc(fsize + 1);
+	char *ciphertext = malloc(fsize + 1);
+	fread(plaintext, 1, fsize, infptr);
+
+	my_encrypt(plaintext, strlen((char *)plaintext), key, NULL, ciphertext, bit_mode);
+
+	// printf("\n %s \n", ciphertext);
+
+	fwrite(ciphertext, sizeof(unsigned char), strlen((char *)ciphertext), outfptr);
 
 	/* decrypt */
+	int dec_len = mydecrypt(ciphertext, strlen((char *)ciphertext), key, NULL, plaintext, bit_mode);
+
+	fwrite(plaintext, sizeof(unsigned char), dec_len, infptr);
+
 
 	/* sign */
 
 	/* verify */
-		
 
 	/* Clean up */
+	fclose(infptr);
+	fclose(outfptr);
+
 	free(input_file);
 	free(output_file);
 	free(password);
