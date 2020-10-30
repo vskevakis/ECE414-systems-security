@@ -14,6 +14,7 @@
 /* 32 byte key (256 bit key) */
 #define AES_256_KEY_SIZE 32/* 16 byte block size (128 bits) */
 #define AES_BLOCK_SIZE 16
+#define CMAC_SIZE 16
 
 
 /* function prototypes */
@@ -154,12 +155,10 @@ keygen(unsigned char *password, unsigned char *key, unsigned char *iv,
 	unsigned char *salt = NULL;
 
 	cipher = EVP_aes_128_ecb();
-	if (bit_mode == 256){
-		cipher = EVP_aes_256_ecb();
-	}
-	else {
-		cipher = EVP_aes_128_ecb();
-	}
+	// if (bit_mode == 256){
+	// 	cipher = EVP_aes_256_ecb();
+	// }
+
 	dgst = EVP_sha1();
 
 	if(!(ctx = EVP_MD_CTX_new()))
@@ -182,6 +181,7 @@ keygen(unsigned char *password, unsigned char *key, unsigned char *iv,
 		strlen(password), 1, key, NULL);
 
 	EVP_MD_CTX_free(ctx);
+	printf("KEY SIZE: %d", strlen(key)*sizeof(char*));
 	return;
 
 }
@@ -334,7 +334,6 @@ gen_cmac(unsigned char *data, size_t data_len, unsigned char *key,
 	return;
 }
 
-
 /*
  * Verifies a CMAC
  */
@@ -346,7 +345,17 @@ verify_cmac(unsigned char *cmac1, unsigned char *cmac2)
 	verify = 0;
 
 	/* TODO Task E */
-	verify = CRYPTO_memcmp(cmac1, cmac2, strlen(cmac1));
+	printf("\nCMAC1: %s\n",cmac1);
+	printf("\nCMAC2: %s\n",cmac2);
+	unsigned char cmac_help[16];
+	int j=0;
+	for (int i=strlen(cmac2)-strlen(cmac1);i<strlen(cmac2);i++){
+		cmac_help[j]=cmac2[i];
+		j++;
+	}
+	printf("\nCMAC2: %s\n",cmac_help);
+	verify = CRYPTO_memcmp(cmac_help, cmac1, strlen(cmac1));
+
 	return verify;
 }
 
@@ -511,11 +520,11 @@ main(int argc, char **argv)
 		// ciphertext[strlen((unsigned char *)plaintext)]='\0';
 		fwrite(ciphertext, sizeof(unsigned char), strlen((char *)ciphertext), outfptr);
 		// Generate CMAC for plaintext
-		gen_cmac(plaintext, strlen((unsigned char *)plaintext) + 1, key, cmac, bit_mode);
+		gen_cmac(plaintext, strlen((unsigned char *)plaintext), key, cmac, bit_mode);
 		// Write CMAC to output file (Sign the file)
 		fwrite(cmac, sizeof(unsigned char), strlen((char *)cmac), outfptr);	
-		printf("\nSize of CMAC: %d", sizeof(char *)*strlen(cmac));
-		printf("\nCMAC: %s ", cmac);
+		printf("\nSize of CMAC: %d", strlen(cmac));
+		printf("\nSize of text: %d ", strlen(plaintext));
 	}
 
 
@@ -535,11 +544,23 @@ main(int argc, char **argv)
 		// Read Ciphertext and CMAC Sign
 		fread(ciphertext, fsize-17, 1, infptr);
 		fread(cmac2, fsize, 1, infptr);
-		// printf("\nCMAC2: %s\n", cmac2);
+		printf("\nLENGTH: %d", strlen(plaintext));
+		printf("\nCIPHER: %s\n", ciphertext);
+		// for (int i=0; i<sizeof(plaintext)-16;i++) {
+		// 	ciphertext[i] = plaintext[i];
+		// }
+		// int j=0;
+		// for (int i=fsize-16; i<strlen(plaintext);i++) {
+		// 	cmac2[j] = plaintext[i];
+		// 	j++;
+		// }
+		printf("\nCMAC2: %s\n", cmac2);
 		// Decrypt ciphertext to plaintext
-		int dec_len = mydecrypt(ciphertext, strlen((unsigned char *)ciphertext) + 1, key, NULL, plaintext, bit_mode);
+		int dec_len = mydecrypt(ciphertext, strlen((unsigned char *)ciphertext), key, NULL, plaintext, bit_mode);
 		// Generate CMAC From plaintext
-		gen_cmac(plaintext, strlen((unsigned char *)plaintext) + 1, key, cmac1, bit_mode);
+		printf("\nDECRYPT %s\n", plaintext);
+		gen_cmac(plaintext, strlen((unsigned char *)plaintext), key, cmac1, bit_mode);
+		printf("\nCMAC1: %s\n", cmac1);
 		// Verify Generated and Read CMAC
 		if (verify_cmac(cmac1,cmac2)==0) {
 			printf("Verified!");
