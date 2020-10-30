@@ -148,23 +148,40 @@ void
 keygen(unsigned char *password, unsigned char *key, unsigned char *iv,
     int bit_mode)
 {
-	// printf(bit_mode);
-	// iv = 1;
-	int itter = 1;
-	int keylen = bit_mode;
+	const EVP_CIPHER *cipher;
+	EVP_CIPHER_CTX *ctx;
+    const EVP_MD *dgst = NULL;
 	unsigned char *salt = NULL;
 
-	PKCS5_PBKDF2_HMAC_SHA1(password, strlen(password), salt, 0,
-		itter, bit_mode, key);
-    // printf("PKCS5_PBKDF2_HMAC_SHA1(\"%s\", \"%s\", %d)=\n", password, salt, itter);
-    // print_hex(key, bit_mode);
+	cipher = EVP_aes_128_ecb();
+	if (bit_mode == 256){
+		cipher = EVP_aes_256_ecb();
+	}
+	else {
+		cipher = EVP_aes_128_ecb();
+	}
+	dgst = EVP_sha1();
 
-	// iv = 1;
-    // EVP_BytesToKey(EVP_aes_256_cbc(), EVP_sha1(), (unsigned char*)salt, (unsigned char*)password,
-	// 	strlen(password), itter, key, key+32);
-    // printf("EVP_BytesToKey(\"%s\", \"%s\", %d)=\n", password, salt, itter);
-    // print_hex(key, bit_mode);
-	
+	if(!(ctx = EVP_MD_CTX_new()))
+		return;
+
+	if (1 != EVP_DigestInit_ex(ctx, dgst, NULL))
+		return;
+
+	if (password)
+	{
+		if (1 != EVP_DigestUpdate(ctx, password , strlen(password)))
+			return;
+	}
+
+	if (1 != EVP_DigestFinal_ex(ctx, key, strlen(key)))
+		return;
+
+
+    EVP_BytesToKey(cipher, dgst, (unsigned char*)salt, (unsigned char*)password,
+		strlen(password), 1, key, NULL);
+
+	EVP_MD_CTX_free(ctx);
 	return;
 
 }
@@ -179,26 +196,38 @@ void my_encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key,
 	
 	int len=0, ciphertext_len=0;
 	EVP_CIPHER_CTX *ctx;
+	EVP_CIPHER *cipher;
+
+	printf("\nPLAINTEXT: %s\n", plaintext);
+
+	cipher = EVP_aes_128_ecb();
+	if (bit_mode == 256)
+		cipher = EVP_aes_256_ecb();
 
 	// Create and initialize the context and return a pointer for success or NULL for failure
 	if (!(ctx = EVP_CIPHER_CTX_new()))
 		return;
 
-	/* Initialize the encryption operation. */
-	if (1 != EVP_EncryptInit_ex(ctx, EVP_aes_128_ecb(), NULL, key, NULL))
+	// /* Initialize the encryption operation. */
+	// if (1 != EVP_EncryptInit_ex(ctx, cipher, NULL, NULL, NULL))
+	// 	return;
+
+	if (1 != EVP_EncryptInit_ex(ctx, cipher, NULL, key, NULL))
 		return;
 
-	if(plaintext)
-	{
+	// if(plaintext)
+	// {
 		if(1 != EVP_EncryptUpdate(ctx, ciphertext, &len, plaintext, plaintext_len))
 			return;
 		ciphertext_len = len;
-	}
+	// }
 
-	if(1 != EVP_EncryptFinal_ex(ctx, ciphertext + len, &len))
-		return;
+	EVP_EncryptFinal_ex(ctx, ciphertext + len, &len);
+		// return;
 
 	ciphertext_len += len;
+	printf("\CIPHERTEXT: %s\n", ciphertext);
+
 
 	/* Clean up */
 	EVP_CIPHER_CTX_free(ctx);
@@ -217,36 +246,57 @@ mydecrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key,
 	int plaintext_len;
 
 	plaintext_len = 0;
-
+	printf("\nCIPHERTEXT: %s\n", ciphertext);
 	/*TODO Task C */
-	int len=0;
-	EVP_CIPHER_CTX *ctx;
+	int ret, len;
+	EVP_CIPHER_CTX *ctx = NULL;
+	EVP_CIPHER *cipher;
+
+	cipher = EVP_aes_128_ecb();
+	if (bit_mode == 256)
+		cipher = EVP_aes_256_ecb();
 
 	// Create and initialize the context and return a pointer for success or NULL for failure
 	if (!(ctx = EVP_CIPHER_CTX_new()))
 		return NULL;
 
-	/* Initialize the encryption operation. */
-	if (1 != EVP_DecryptInit_ex(ctx, EVP_aes_128_ecb(), NULL, key, NULL))
+	/* Initialise the decryption operation. */
+    // if(!EVP_DecryptInit_ex(ctx, cipher, NULL, NULL, NULL))
+    //     return NULL;
+
+	/* Initialize key */
+	if (1 != EVP_DecryptInit_ex(ctx, cipher, NULL, key, NULL))
 		return NULL;
 
-	if(ciphertext)
-	{
-		if(1 != EVP_DecryptUpdate(ctx, plaintext, &len, ciphertext, ciphertext_len))
-			return NULL;
-
-		plaintext_len = len;
-	}
-
-	if(1 != EVP_DecryptFinal_ex(ctx, plaintext + len, &len))
+	// if(ciphertext)
+	// {
+	if (1 != EVP_DecryptUpdate(ctx, plaintext, &len, ciphertext, ciphertext_len))
 		return NULL;
 
-	plaintext_len += len;
+	plaintext_len = len;
+	// }
 
+	
+	EVP_DecryptFinal_ex(ctx, plaintext + len, &len);
+        // return NULL;
+    plaintext_len += len;
+		
+	printf("\nPLAINTEXT: ");
+	print_string(plaintext, plaintext_len);
 	/* Clean up */
 	EVP_CIPHER_CTX_free(ctx);
 
-	return plaintext_len;
+    // if(ret > 0)
+    // {
+	// 		/* Success */
+    //     plaintext_len += len;
+        return plaintext_len;
+    // }
+    // else
+    // {
+    //     /* Verify failed */
+    //     return -1;
+    // }
 }
 
 
@@ -259,7 +309,36 @@ gen_cmac(unsigned char *data, size_t data_len, unsigned char *key,
 {
 
 	/* TODO Task D */
+	size_t cmaclen;
+	int keylen;
+	CMAC_CTX *ctx;
+	EVP_CIPHER *cipher;
 
+	keylen = 16;
+	cipher = EVP_aes_128_ecb();
+
+	if (bit_mode==256) {
+		keylen = 32;
+		cipher = EVP_aes_256_ecb();
+	}
+
+	if(!(ctx = CMAC_CTX_new()))
+		return;
+
+	if (1 != CMAC_Init(ctx, key, keylen, cipher, NULL))
+		return;
+
+	if (data)
+	{
+		if (1 != CMAC_Update(ctx, data , data_len))
+			return;
+	}
+
+	if (1 != CMAC_Final(ctx, cmac, &cmaclen))
+		return;
+
+	CMAC_CTX_free(ctx);
+	return;
 }
 
 
@@ -274,7 +353,11 @@ verify_cmac(unsigned char *cmac1, unsigned char *cmac2)
 	verify = 0;
 
 	/* TODO Task E */
-
+	verify = strcmp(cmac1, cmac2);
+	// if (verify==0) {
+		printf("\nCMAC1: %s", cmac1);
+		printf("\nCMAC2: %s", cmac2);
+	// }
 	return verify;
 }
 
@@ -356,55 +439,118 @@ main(int argc, char **argv)
 	check_args(input_file, output_file, password, bit_mode, op_mode);
 
 	/* TODO Develop the logic of your tool here... */
-
-	/* Initialize the library */
-	unsigned char key[bit_mode];	/* the user defined password */
-	unsigned char *iv = "1234";	/* the user defined password */
+	
+	/* Read the INPUT and OUTPUT File */
 	FILE *infptr, *outfptr;
+	long fsize=0;
 
-
-	/* Keygen from password */
-	keygen(password, key, iv, bit_mode);
-
-
-	/* Operate on the data according to the mode */
-	/* encrypt */
-	// infptr = fopen(input_file, "r");
-	if ((outfptr = fopen(output_file, "w+")) == NULL) {
+	if ((outfptr = fopen(output_file, "wb")) == NULL) {
 		printf("Error opening output file");
 		exit(1);
 	}
-	else if (((infptr = fopen(input_file, "r")) == NULL)) {
+	else if (((infptr = fopen(input_file, "rb")) == NULL)) {
 		printf("Error opening input file");
 		exit(1);
 	}
-	fseek(infptr, 0, SEEK_END);
-	long fsize = ftell(infptr);
-	fseek(infptr, 0, SEEK_SET);  /* same as rewind(f); */
-	char *plaintext = malloc(fsize + 1);
-	char *ciphertext = malloc(fsize + 1);
-	fread(plaintext, 1, fsize, infptr);
 
-	my_encrypt(plaintext, strlen((char *)plaintext), key, NULL, ciphertext, bit_mode);
+	/* Initialize the library */
+	OpenSSL_add_all_algorithms();
+    ERR_load_crypto_strings();  
+	unsigned char *key = malloc(160);	/* the user defined password */
+	unsigned char *plaintext;
+	unsigned char *ciphertext;
+	unsigned char cmac[16] = {0};
+	unsigned char cmac1[16] = {0};
+	unsigned char cmac2[16] = {0};
 
-	// printf("\n %s \n", ciphertext);
+	// if (bit_mode == 256) {
+	// 	unsigned char cmac[32] = {0};
+	// }
 
-	fwrite(ciphertext, sizeof(unsigned char), strlen((char *)ciphertext), outfptr);
+	/* Keygen from password */
+	keygen(password, key, NULL, bit_mode);
+	// printf("\nKey is: %s", key);
+	// printf("\nBits: %d\n", sizeof(char*)*strlen(key));
+	// print_string(key,strlen(key));
+	/* Operate on the data according to the mode */
+	/* encrypt */
+	if (op_mode==0) {
+		// Read Plaintext from input file
+		fseek(infptr, 0L, SEEK_END); // Find the length of the text
+		fsize = ftell(infptr); 
+		fseek(infptr, 0L, SEEK_SET); // Return to the begging of the file
+		plaintext = calloc( 1, fsize+1 );
+		ciphertext = calloc( 1, fsize+1 );
+		fread(plaintext, 1, fsize, infptr); // Actually Read from the file's start to the file's end
+		print_string(plaintext, strlen(plaintext));
+		// Encrypt plaintext to ciphertext
+		my_encrypt(plaintext, strlen((char *)plaintext), key, NULL, ciphertext, bit_mode);
+		// Write cipher text to output file
+		// ciphertext[strlen((unsigned char *)plaintext)]='\0';
+		fwrite(ciphertext, sizeof(unsigned char), strlen((char *)ciphertext), outfptr);
+	}
 
 	/* decrypt */
-	int dec_len = mydecrypt(ciphertext, strlen((char *)ciphertext), key, NULL, plaintext, bit_mode);
+	if (op_mode==1) {
+		// Read Ciphertext from input file
+		fseek(infptr, 0L, SEEK_END); // Find the length of the text
+		fsize = ftell(infptr); 
+		fseek(infptr, 0L, SEEK_SET); // Return to the begging of the file
+		plaintext = calloc( 1, fsize+1 );
+		ciphertext = calloc( 1, fsize+1 );
+		fread(ciphertext, 1, fsize, infptr); // Actually Read from the file's start to the file's end
+		// Decrypt ciphertext to plaintext
+		int dec_len = mydecrypt(ciphertext, strlen((char *)ciphertext), key, NULL, plaintext, bit_mode);
+		plaintext[dec_len]='\0'; // Prevent txt file from corrupting
 
-	fwrite(plaintext, sizeof(unsigned char), dec_len, infptr);
+		// Write plaintext to output file
+		fwrite(plaintext, sizeof(unsigned char), strlen(plaintext), outfptr);
+	}
 
 
 	/* sign */
+	if (op_mode==2) {
+		// Read Plaintext from input file
+		fread(plaintext, 1, fsize, infptr);
+		// Encrypt plaintext to ciphertext
+		my_encrypt(plaintext, strlen((unsigned char *)plaintext) + 1, key, NULL, ciphertext, bit_mode);
+		// Write cipher text to output file
+		fwrite(ciphertext, sizeof(unsigned char), strlen((char *)ciphertext), outfptr);
+		// Generate CMAC for plaintext
+		gen_cmac(plaintext, strlen((unsigned char *)plaintext) + 1, key, cmac, bit_mode);
+		// Write CMAC to output file (Sign the file)
+		fwrite(cmac, sizeof(unsigned char), strlen((unsigned char *)cmac), outfptr);	
+		printf("\nSize of CMAC: %d", sizeof(cmac));
+		printf("\n Plaintext1 Length: %d ", strlen(plaintext));
+	}
 
-	/* verify */
 
+	// /* verify */
+	// char *signedtext = malloc(fsize + 1);
+	// if ((outfptr = fopen(output_file, "w+")) == NULL) {
+	// 	printf("Error opening output file");
+	// 	exit(1);
+	// }
+	if (op_mode==3) {
+		// Read Ciphertext and CMAC Sign
+		fread(ciphertext, 1, fsize-17, outfptr);
+		fread(cmac2, 1, fsize-1, outfptr);
+		// Decrypt ciphertext to plaintext
+		int dec_len = mydecrypt(ciphertext, strlen((unsigned char *)ciphertext) + 1, key, NULL, plaintext, bit_mode);
+		// Generate CMAC From plaintext
+		gen_cmac(plaintext, strlen((unsigned char *)plaintext) + 1, key, cmac1, bit_mode);
+		// Verify Generated and Read CMAC
+		verify_cmac(cmac1,cmac2);
+
+		printf("\n Plaintext2 Length: %d ", strlen(plaintext));
+
+		printf("\n CMAC1 Length: %d \nCMAC2 Length: %d", sizeof(cmac1), sizeof(cmac2));
+	}
+
+	
 	/* Clean up */
 	fclose(infptr);
 	fclose(outfptr);
-
 	free(input_file);
 	free(output_file);
 	free(password);
