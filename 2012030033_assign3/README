@@ -1,0 +1,11 @@
+TASK A
+I generate the prime pool and return with the function sieve_of_eratosthenes one random prime from the prime pool each time the function is called.
+
+TASK B + C
+I use two functions for reading and two for writing to read and write size_t and char types for input - output and key.
+
+TASK D
+Successfully encrypted and decrypted all files.
+
+
+*I have used comments on my code to explain furthermore due to lack of time to write an extensive README file.
