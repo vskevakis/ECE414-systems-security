@@ -16,8 +16,8 @@ int main()
 
 
 	/* example source code */
-	setreuid(001,001);
-	system("./test_aclog");
+	// setreuid(001,001);
+	// system("./test_aclog");
 
 	for (i = 0; i < 10; i++) {
 
@@ -31,8 +31,34 @@ int main()
 
 	}
 
+	// file = fopen("my_test_file", "a");
+	// if (file == NULL) 
+	// 	printf("fopen error\n");
+	// else {
+	// 	// bytes = fwrite(filenames[i], strlen(filenames[i]), 1, file);
+	// 	fclose(file);
+	// }
 
-	/* add your code here */
+	for (i = 0; i < 10; i++) {
+		chmod(filenames[i], 0);
+		file = fopen(filenames[i], "w+");
+		if (file == NULL) 
+			printf("fopen error\n");
+		else {
+			bytes = fwrite(filenames[i], strlen(filenames[i]), 1, file);
+			fclose(file);
+		}
+	}
+
+
+	// /* add your code here */
+	// file = fopen(filenames[10], "w+");
+	// if (file == NULL) 
+	// 	printf("fopen error\n");
+	// else {
+	// 	bytes = fwrite(filenames[10], strlen(filenames[10]), 1, file);
+	// 	fclose(file);
+	// }
 	/* Setting UID to 1 */
 	// int real = getuid();
 	// int euid = geteuid();

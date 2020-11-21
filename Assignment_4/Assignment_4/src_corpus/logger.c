@@ -1,4 +1,5 @@
 #define _GNU_SOURCE
+#define MD5_LENGTH 16
 
 #include <time.h>
 #include <stdio.h>
@@ -9,23 +10,39 @@
 #include <sys/stat.h>
 #include <openssl/md5.h>
 
+
+FILE * 
+fopen_direct(const char *path, const char *mode){
+
+    FILE *original_fopen_ret;
+    FILE *(*original_fopen)(const char*, const char*);
+
+    /* call the original fopen function */
+    original_fopen = dlsym(RTLD_NEXT, "fopen");
+    original_fopen_ret = (*original_fopen)(path, mode);
+
+    return original_fopen_ret;
+}
+
 /* Add to Log file func */
 void
-log(uid_t uid, unsigned char *file_name, char *datetime, int access_type, int is_action_denied, unsigned char md5){
+write_log(int uid, unsigned char *file_name, char *datetime, int access_type, int is_action_denied, char *digest){
 	/* Log File */
-	FILE *ptr;
-	ptr = fopen("logfile.txt" ,"a+");
+	FILE * ptr;
+	ptr = fopen_direct("logfile.txt" ,"a");
 	if (ptr != NULL) {
-		printf("Writting to log file");
-	fprintf("\n%d %c %c %d %d %c \n", uid, file_name, datetime, access_type, is_action_denied, md5);
+		fprintf(ptr, "%d %s %s %d %d %s\n", uid, file_name, strtok(datetime, "\n"), access_type, is_action_denied, digest);
 	}
 
 	fclose(ptr);
 }
 
+
 FILE *
 fopen(const char *path, const char *mode) 
 {
+	/* Have to check file existence before procceding */
+	int exists = cfileexists(path); // Helper
 
 	FILE *original_fopen_ret;
 	FILE *(*original_fopen)(const char*, const char*);
@@ -35,124 +52,56 @@ fopen(const char *path, const char *mode)
 	original_fopen_ret = (*original_fopen)(path, mode);
 
 
-	/* add your code here */
-	printf("Hey");
-	MD5_CTX *c;
-	FILE *ptr;
-	uid_t uid;
-	time_t current_time;
+	/* add your code here */	
+	char md5_hash[MD5_LENGTH*2+1];
+	// char *md5_hash = (char*)malloc(MD5_LENGTH*2+1);
+	int uid = getuid();
 	unsigned char *file_name, *datetime;
 	int file_mode, is_action_denied;
 
-	unsigned char digest[16];
 
-	/* Initializing MD5 Hash */
-	MD5_Init(c);
+	/* Getting the time */
+	time_t now = time(&now);        
+    struct tm *ptm = localtime(&now); 
 
 	/* Action is denied until proven the oposite */
 	is_action_denied = 1;
-
-	uid = getuid(); // Get user ID
-	strcpy(file_name, path); // Get File Name
-
-	/* Getting the Date and Time */
-	current_time = time(NULL);
-
-	if (current_time == ((time_t)-1))
-    {
-        (void) fprintf(stderr, "Failure to obtain the current time.\n");
-        exit(EXIT_FAILURE);
-    }
-
-    datetime = ctime(&current_time);
-
-	if (datetime == NULL)
-    {
-        (void) fprintf(stderr, "Failure to convert the current time.\n");
-        exit(EXIT_FAILURE);
-    }
+	
+	file_name = realpath(path, NULL);
 
 	/* Checking fopen Mode and if user has permission for each action */
-	/* Case mode == 2 || Open a file */
-	if (strcmp(mode, "r") || (strcmp(mode, "rb"))) {
-		file_mode = 2;
-		if ((access, R_OK) == 0) { 
-			/* access will return 0 for permission success */
-			is_action_denied = 0;
-
-			fopen(path, "rb");
-			fseek(ptr, 0, SEEK_END);
-			int flen = ftell(ptr);
-			rewind(ptr);
-
-			unsigned char buffer = (unsigned char *)malloc(flen * sizeof(char));
-			fread(buffer, flen, 1, ptr);
-
-			/* Updating MD5 */
-			MD5_Update(c, buffer, flen);
-
-			fclose(ptr);
-			free(buffer);
+	/* Case mode == 1 || File Creation */
+    if (exists) {
+		if (!strcmp(mode, "r") || (!strcmp(mode, "rb"))) {
+			file_mode = 2;
+			if (access(path, R_OK) == 0)
+				is_action_denied = 0;
 		}
-		else
-		{
-			/* If user doesn't have permission we write NULL to MD5 */
-			unsigned char *buffer = NULL;
-			MD5_Update(c, buffer, strlen(buffer));
-		}
+		else {
+			file_mode = 3;
+			if (access(path, W_OK) == 0) {
+				is_action_denied = 0;
+			}
+		}	
+    }
+	else
+	{
+		file_mode = 1;
+		printf("File Mode: 1");
+			if (access(path, W_OK) == 0)
+				is_action_denied = 0;	
+	}
+
+	if ((is_action_denied==1) || (file_mode==1)) {
+		/* MD5 is hash if user can't access the file or file is just created */
+		strcpy(md5_hash, "0");
 	}
 	else {
-		/* If original fopen with read rights is success then the file exists */
-		/* Case mode == 3 || Write to file */
-		if (ptr = original_fopen(path, "r")){
-			file_mode = 3;
-			if ((access, W_OK) == 0) {
-				is_action_denied = 0;
-
-				fseek(ptr, 0, SEEK_END);
-				int flen = ftell(ptr);
-				rewind(ptr);
-
-				unsigned char buffer = (unsigned char *)malloc(flen * sizeof(char));
-				fread(buffer, flen, 1, ptr);
-
-				/* Updating MD5 */
-				MD5_Update(c, buffer, flen);
-
-				fclose(ptr);
-				free(buffer);
-			}
-			else
-			{
-			/* If user doesn't have permission we write NULL to MD5 */
-			unsigned char *buffer = NULL;
-			MD5_Update(c, buffer, strlen(buffer));
-			}	
-    	}
-		else {
-			/* Case mode == 1 || Create a new file */
-			file_mode = 1;
-			if ((access, W_OK) == 0) 
-				is_action_denied = 0;
-
-			/* If user doesn't have permission or file is new we write NULL to MD5 */
-			unsigned char *buffer = NULL;
-			MD5_Update(c, buffer, strlen(buffer));
-		}
+		gen_md5(path, md5_hash);
 	}
-	
-	/* File Fingerprint Finalize*/
-	MD5_Final(digest, c);
 
 	/* Call log */	
-	log(uid, path, datetime, file_mode, is_action_denied, digest);
-
-
-	/* ... */
-	/* ... */
-	/* ... */
-	/* ... */
-
+	write_log(uid, path, asctime(ptm), file_mode, is_action_denied, md5_hash);
 
 	return original_fopen_ret;
 }
@@ -171,7 +120,6 @@ fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 
 
 	/* add your code here */
-	printf("Hey");
 	/* ... */
 	/* ... */
 	/* ... */
@@ -181,4 +129,60 @@ fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 	return original_fwrite_ret;
 }
 
+int cfileexists(const char* filename){
+    struct stat buffer;
+    int exist = stat(filename,&buffer);
+    if(exist == 0)
+        return 1;
+    else // -1
+        return 0;
+}
 
+void
+gen_md5(const char *path, char md5_hash[]) {
+	
+	MD5_CTX c;
+    FILE *file = fopen_direct(path, "r"); 
+	unsigned char *buffer;
+	unsigned char digest[MD5_LENGTH];
+
+	fseek(file, 0, SEEK_END); // Find the length of the file
+	int fsize = ftell(file); // Save Length
+	fseek(file, 0L, SEEK_SET); // Return to the start of the file
+
+	buffer = (unsigned char *)malloc(fsize);
+
+	fread(buffer, 1, fsize, file); // Read Buffer
+
+	// print_string(buffer,fsize);
+
+	/* Generate MD5 Hash */
+	MD5_Init(&c);
+
+	MD5_Update(&c, buffer, fsize);
+	
+	MD5_Final(digest, &c);
+
+	/* Make it HEX */
+	for(int i=0,j=0;i<MD5_DIGEST_LENGTH;i++,j+=2){
+        sprintf(&md5_hash[j], "%02X", digest[i]);
+    }
+
+	free(buffer);
+	fclose(file); 
+	return;
+}
+
+void
+print_string(unsigned char *data, size_t len)
+{
+	size_t i;
+
+	if (!data)
+		printf("NULL data\n");
+	else {
+		for (i = 0; i < len; i++)
+			printf("%c", data[i]);
+		printf("\n");
+	}
+}
