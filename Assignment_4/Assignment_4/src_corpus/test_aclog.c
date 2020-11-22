@@ -48,6 +48,7 @@ int main()
 			bytes = fwrite(filenames[i], strlen(filenames[i]), 1, file);
 			fclose(file);
 		}
+		chmod(filenames[i], 1);
 	}
 
 

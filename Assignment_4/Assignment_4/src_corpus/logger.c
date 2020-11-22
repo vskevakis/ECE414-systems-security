@@ -54,7 +54,6 @@ fopen(const char *path, const char *mode)
 
 	/* add your code here */	
 	char md5_hash[MD5_LENGTH*2+1];
-	// char *md5_hash = (char*)malloc(MD5_LENGTH*2+1);
 	int uid = getuid();
 	unsigned char *file_name, *datetime;
 	int file_mode, is_action_denied;
@@ -101,7 +100,7 @@ fopen(const char *path, const char *mode)
 	}
 
 	/* Call log */	
-	write_log(uid, path, asctime(ptm), file_mode, is_action_denied, md5_hash);
+	write_log(uid, file_name, asctime(ptm), file_mode, is_action_denied, md5_hash);
 
 	return original_fopen_ret;
 }
@@ -120,11 +119,44 @@ fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 
 
 	/* add your code here */
-	/* ... */
-	/* ... */
-	/* ... */
-	/* ... */
+	char md5_hash[MD5_LENGTH*2+1];
+	int MAXSIZE = 0xFFF;
+    char proclnk[0xFFF];
+    char path[0xFFF];
+	int uid = getuid();
+	unsigned char *file_name, *datetime;
+	int fno, file_mode, is_action_denied;
+	ssize_t r;
 
+	/* Finding file name from fp */
+	if (stream != NULL)
+    {
+        fno = fileno(stream);
+        sprintf(proclnk, "/proc/self/fd/%d", fno);
+        r = readlink(proclnk, path, MAXSIZE);
+        if (r < 0)
+        {
+            printf("failed to readlink\n");
+            exit(1);
+        }
+        path[r] = '\0';
+    }
+	fflush(stream);
+	file_name = basename(path);
+	printf("FILENAME IS %s\n", file_name);
+
+	/* Getting the time */
+	time_t now = time(&now);        
+    struct tm *ptm = localtime(&now); 
+
+	/* Action is denied until proven the oposite */
+	is_action_denied = 1;
+
+	if (access(file_name, W_OK)==0)
+		is_action_denied = 0;
+
+	gen_md5(file_name, md5_hash);
+	write_log(uid, path, asctime(ptm), 3, is_action_denied, md5_hash);
 
 	return original_fwrite_ret;
 }
@@ -142,7 +174,8 @@ void
 gen_md5(const char *path, char md5_hash[]) {
 	
 	MD5_CTX c;
-    FILE *file = fopen_direct(path, "r"); 
+	FILE *file = fopen_direct(path, "r"); 
+		
 	unsigned char *buffer;
 	unsigned char digest[MD5_LENGTH];
 
@@ -154,7 +187,7 @@ gen_md5(const char *path, char md5_hash[]) {
 
 	fread(buffer, 1, fsize, file); // Read Buffer
 
-	// print_string(buffer,fsize);
+	print_string(buffer,fsize);
 
 	/* Generate MD5 Hash */
 	MD5_Init(&c);
