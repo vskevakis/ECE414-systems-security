@@ -15,10 +15,8 @@ int main()
 			"file_5", "file_6", "file_7", 		
 			"file_8", "file_9"};
 
-
 	/* example source code */
-	// setreuid(001,001);
-	// system("./test_aclog");
+	
 
 	for (i = 0; i < 10; i++) {
 
@@ -32,17 +30,9 @@ int main()
 
 	}
 
-	// file = fopen("my_test_file", "a");
-	// if (file == NULL) 
-	// 	printf("fopen error\n");
-	// else {
-	// 	// bytes = fwrite(filenames[i], strlen(filenames[i]), 1, file);
-	// 	fclose(file);
-	// }
-
 	for (i = 0; i < 10; i++) {
 		chmod(filenames[i], 0); // Revoke permissions
-		file = fopen(filenames[i], "w+");
+		file = fopen(filenames[i], "r");
 		if (file == NULL) 
 			printf("fopen error\n");
 		else {
@@ -51,6 +41,19 @@ int main()
 		}
 		chmod(filenames[i], S_IRWXU); // Return permissions
 	}
+
+	for (i = 0; i < 10; i++) {
+		// chmod(filenames[i], 0); // Revoke permissions
+		file = fopen(filenames[i], "a");
+		if (file == NULL) 
+			printf("fopen error\n");
+		else {
+			bytes = fwrite(filenames[i], strlen(filenames[i]), 1, file);
+			fclose(file);
+		}
+		// chmod(filenames[i], S_IRWXU); // Return permissions
+	}
+
 
 
 	// /* add your code here */

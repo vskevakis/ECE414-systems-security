@@ -6,12 +6,6 @@
 #include <string.h>
 #include <unistd.h>
 
-/* Some helper functions and stuff */
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <stdbool.h>
-
 struct access {
    int data;
    int key;
@@ -147,7 +141,7 @@ void printList() {
 }
 
 //delete a link with given key
-struct node* delete(int key) {
+struct node* delete_node(int key) {
 
    //start from the first link
    struct node* current = head;
@@ -218,7 +212,7 @@ void insertList(int key, int data, char *file) {
 	// 		file_exists = 0;
 	// }
 	if (data<9) {
-		link = delete(key);
+		link = delete_node(key);
 		
 		link->key = key;
 		link->data = data;
@@ -259,7 +253,6 @@ struct node* find(int key) {
    //if data found, return the current Link
    return current;
 }
-
 
 
 struct entry {

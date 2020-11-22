@@ -87,7 +87,6 @@ fopen(const char *path, const char *mode)
 	else
 	{
 		file_mode = 1;
-		printf("File Mode: 1");
 			if (access(path, W_OK) == 0)
 				is_action_denied = 0;	
 	}
@@ -144,7 +143,6 @@ fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
     }
 	fflush(stream);
 	file_name = basename(path);
-	printf("FILENAME IS %s\n", file_name);
 
 	/* Getting the time */
 	time_t now = time(&now);        
@@ -188,7 +186,7 @@ gen_md5(const char *path, char md5_hash[]) {
 
 	fread(buffer, 1, fsize, file); // Read Buffer
 
-	print_string(buffer,fsize);
+	// print_string(buffer,fsize);
 
 	/* Generate MD5 Hash */
 	MD5_Init(&c);
