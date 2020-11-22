@@ -29,7 +29,7 @@ void
 write_log(int uid, unsigned char *file_name, char *datetime, int access_type, int is_action_denied, char *digest){
 	/* Log File */
 	FILE * ptr;
-	ptr = fopen_direct("logfile.txt" ,"a");
+	ptr = fopen_direct("file_logging.log" ,"a");
 	if (ptr != NULL) {
 		fprintf(ptr, "%d %s %s %d %d %s\n", uid, file_name, strtok(datetime, "\n"), access_type, is_action_denied, digest);
 	}

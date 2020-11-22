@@ -3,6 +3,7 @@
 
 #include <sys/types.h>
 #include <unistd.h>
+#include <sys/stat.h>
 
 int main() 
 {
@@ -40,7 +41,7 @@ int main()
 	// }
 
 	for (i = 0; i < 10; i++) {
-		chmod(filenames[i], 0);
+		chmod(filenames[i], 0); // Revoke permissions
 		file = fopen(filenames[i], "w+");
 		if (file == NULL) 
 			printf("fopen error\n");
@@ -48,7 +49,7 @@ int main()
 			bytes = fwrite(filenames[i], strlen(filenames[i]), 1, file);
 			fclose(file);
 		}
-		chmod(filenames[i], 1);
+		chmod(filenames[i], S_IRWXU); // Return permissions
 	}
 
 
