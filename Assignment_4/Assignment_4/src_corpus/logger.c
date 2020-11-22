@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 #define MD5_LENGTH 16
+#define MD5_HASH 33
 
 #include <time.h>
 #include <stdio.h>
