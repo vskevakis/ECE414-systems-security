@@ -1,3 +1,0 @@
-Sign this file using a 128-bit key.
-The key should be generated using TUC<AM> as password.
-For example, if your AM is 2020123456 the password sh
